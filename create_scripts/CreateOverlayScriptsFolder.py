@@ -1,6 +1,7 @@
 import re, os, sys
 import subprocess
 import argparse
+from pathlib import Path
 
 def normalize_path(path):
 	import os
@@ -81,17 +82,77 @@ def get_full_path():
 	parent_directory = os.path.dirname(application_path)
 	return normalize_path(parent_directory)
 
-def py_depot_path_to_relative_path(depot_path:str):
+def py_depot_path_to_relative_path(depot_path:str, need_file_name=True):
 	file_path = normalize_path(depot_path)
 	parts = file_path.split('/')
 	try:
 		index = parts.index('Scripts')
-		return '/'.join(parts[index:])
+		if need_file_name:
+			path = '/'.join(parts[index:])
+		else:
+			path = '/'.join(parts[index:-1])
+		return path
 	except ValueError:
 		print(f"Could not find UnrealEngine in path: {depot_path}")
 		return ''
 
-def get_changelist_files(changelist_num):
+def filter_depot_file_paths(depot_files):
+	if depot_files:
+		files = []
+		# 分割成行并去除每行开头的空白字符
+		for line in depot_files.split('\n'):
+			line = line.strip()
+			if line and not line.startswith('... #'):
+				action_and_file = line.split()
+				if len(action_and_file) >= 3:
+					file_path:str
+					action, file_path = action_and_file[2], action_and_file[0]
+					if action.lower() != 'delete':
+						real_file_path = file_path.split('#')[0]
+						if real_file_path.endswith('.py'):
+							files.append(real_file_path)
+		return files
+	else:
+		return []
+
+def get_single_changelist_local_changelist_files(workspace_name, changelist_num) -> list[tuple]:
+	""" 获取本地文件列表 """
+	command = [
+		"p4",
+		"-c",
+		workspace_name,
+		"opened",
+		"-c",
+		str(changelist_num)
+	]
+	output = run_win_command(command)
+	filted_depot_files = filter_depot_file_paths(output)
+	result_files = []
+	for file_path in filted_depot_files:
+		command = [
+			"p4",
+			"-c",
+			workspace_name,
+			"where",
+			file_path
+		]
+		output = run_win_command(command)
+		print(f" {output=}")
+		if not output:
+			continue
+		real_path = output.split()[2]
+		result_files.append((file_path, real_path))
+	return result_files
+
+def get_local_changelist_files(workspace_name, changelist_num_list) -> list[tuple]:
+	""" 获取本地文件列表 """
+	result_files = []
+	for changelist_num in changelist_num_list:
+		files = get_single_changelist_local_changelist_files(workspace_name, changelist_num)
+		result_files.extend(files)
+	return list(set(result_files))
+
+def get_server_changelist_file_dict(changelist_num_list):
 	def extract_affected_files(text):
 		# 使用正则表达式匹配 "Affected files ..." 和下一个空行之间的内容
 		pattern = r"Affected files \.\.\.(.+?)(?:\n\s*\n|\Z)"
@@ -102,45 +163,54 @@ def get_changelist_files(changelist_num):
 			match = re.search(pattern, text, re.DOTALL)
 		if match:
 			affected_files = match.group(1).strip()
-			files = []
-			# 分割成行并去除每行开头的空白字符
-			for line in affected_files.split('\n'):
-				line = line.strip()
-				if line and not line.startswith('... #'):
-					action_and_file = line.split()
-					if len(action_and_file) >= 3:
-						action, file_path = action_and_file[2], action_and_file[1]
-						if action.lower() != 'delete':
-							files.append(file_path)
-			return files
+			if affected_files:
+				# 分割成行并去除每行开头的空白字符
+				file_dict = {}
+				for line in affected_files.split('\n'):
+					line = line.strip()
+					if line and not line.startswith('... #'):
+						action_and_file = line.split()
+						if len(action_and_file) >= 3:
+							action, file_path = action_and_file[2], action_and_file[1]
+							if action.lower() != 'delete':
+								real_file_path = file_path.split('#')[0]
+								if real_file_path.endswith('.py'):
+									file_dict[real_file_path] = changelist_num
+				return file_dict
+			else:
+				return {}
 		else:
-			return []
+			return {}
+		
+	sorted_changelists = sorted(list(set(changelist_num_list)))
+	print(f"{sorted_changelists=}")
+	result_files = {}
+	for changelist_num in sorted_changelists:
+		command = [
+			"p4",
+			"describe",
+			"-S",
+			str(changelist_num)
+		]
+		output = run_win_command(command)
+		if not output:
+			continue
+		finded_files = extract_affected_files(output)
+		if finded_files:
+			result_files.update(finded_files)
+	return result_files
 
-	command = [
-		"p4",
-		"describe",
-		"-S",
-		str(changelist_num)
-	]
-	output = run_win_command(command)
-	if output:
-		return extract_affected_files(output)
-	return []
-
-def fetch_and_save_file_from_perforce(perforce_path, destination_path, changelist_num):
-	# 步骤1: 解析Perforce路径和版本号
-	depot_path, version = parse_perforce_path(perforce_path)
-	
-	# 步骤2: 确保目标文件夹存在,如果不存在则创建
+def fetch_and_save_file_from_perforce(depot_path, destination_path, changelist_num):
+	# 步骤1: 确保目标文件夹存在,如果不存在则创建
 	os.makedirs(os.path.dirname(destination_path), exist_ok=True)
 	
-	# 步骤3: 使用p4 print命令获取指定版本的文件内容
+	# 步骤2: 使用p4 print命令获取指定版本的文件内容
 	output = run_win_command(['p4', 'print', f'{depot_path}@={changelist_num}'])
 	
-	# 步骤4: 去掉第一行（//depot 路径信息），只保留文件内容
+	# 步骤3: 去掉第一行（//depot 路径信息），只保留文件内容
 	file_content = '\n'.join(output.split('\n')[1:])
 
-	# 步骤5: 将内容写入目标文件
+	# 步骤4: 将内容写入目标文件
 	with open(destination_path, 'w', encoding='utf-8') as f:
 		try:
 			f.write(file_content)
@@ -154,7 +224,7 @@ def open_win_folder(folder_path):
 	folder_path = to_win_cmd_path(folder_path)
 	command = f'explorer "{folder_path}"'
 	exit_code = os.system(command)
-	if exit_code == 0:
+	if exit_code == 1:
 		print(f"成功打开文件夹: {folder_path}")
 	else:
 		print(f"打开文件夹失败，错误代码: {exit_code}")
@@ -166,6 +236,7 @@ def win_remove_file_or_folder(path:str):
 	path = to_win_cmd_path(path)
 	if not os.path.exists(path):
 		print(f"路径不存在 不需要删除: {path}")
+		print()
 		return
 
 	try:
@@ -188,6 +259,7 @@ def win_remove_file_or_folder(path:str):
 			print(f"路径不存在或不是文件或目录: {path}")
 	except (OSError, subprocess.CalledProcessError) as e:
 		print(f"删除失败 {path} \n 错误: {str(e)}")
+	print()
 
 
 def zip_folder_to_owning_folder(folder_path):
@@ -203,52 +275,86 @@ def zip_folder_to_owning_folder(folder_path):
 	else:
 		print(f"压缩文件夹失败，错误代码: {exit_code}")
 
-def _create_scripts_folder_from_changelist(changelist_num = 0):
-	"""尝试创建Windows文件夹"""
-	if isinstance(changelist_num, str):
-		if changelist_num.isdigit():
-			changelist_num = int(changelist_num)
-		else:
-			print(f'CreateScriptsFolder: change num invalid {changelist_num=}')
-			return
+def move_local_file_to_target_file_path(local_path, target_path):
+	os.makedirs(target_path, exist_ok=True)
+	command = f'copy {local_path} {target_path}'
+	run_output = os.system(command)
+	if run_output == 0:
+		print(f"移动文件 {local_path} 成功")
+	else:
+		print(f"移动文件 {local_path} to {target_path} 失败")
 
-	files = get_changelist_files(changelist_num)
+def _create_scripts_folder_from_changelist(workspace_name, changelist_num_list):
+	"""尝试创建Windows文件夹"""
+	file_dict = get_server_changelist_file_dict(changelist_num_list)
+	if workspace_name:
+		local_files = get_local_changelist_files(workspace_name, changelist_num_list)
+	else:
+		local_files = []
+
 	unreal_parent_path = get_full_path() + "/OverlayFolder"
 	toolbox_parent_path = "Windows/Marvel/Content/Marvel"
 	# 删除OverlayFolder文件夹
 	win_remove_file_or_folder(f"{unreal_parent_path}")
-
 	files_str = ''
-	if files:
-		for file in files:
-			depot_path, version = parse_perforce_path(file)
+	if local_files:
+		files_str += '以下文件被复制:\n'
+		print("开始处理本地文件：")
+		for file in local_files:
+			depot_file_path, local_file_path = file
+			if depot_file_path in file_dict:
+				print(f'file exist local {depot_file_path=}, prefer use local file')
+				file_dict.pop(depot_file_path)
+			new_path = py_depot_path_to_relative_path(depot_file_path, False)
+			target_path = f"{unreal_parent_path}/{toolbox_parent_path}/{new_path}"
+			target_path = to_win_cmd_path(target_path)
+			move_local_file_to_target_file_path(local_file_path, target_path)
+			files_str += f'{local_file_path} \n'
+	
+	print()
+	print("开始处理下载文件：")
+	if file_dict:
+		files_str += '以下文件被下载:\n'
+		for depot_path, changelist_num in file_dict.items():
 			if not depot_path.endswith('.py'):
 				continue
-			files_str += f'{file} \n'
+			files_str += f'{depot_path} {changelist_num} \n'
 			new_path = py_depot_path_to_relative_path(depot_path)
 			
 			target_path = f"{unreal_parent_path}/{toolbox_parent_path}/{new_path}"
-			fetch_and_save_file_from_perforce(file, target_path, changelist_num)
+			fetch_and_save_file_from_perforce(depot_path, target_path, changelist_num)
 
-		if files_str:
-			# 压缩文件夹(有文件被复制才压缩)
-			zip_folder_to_owning_folder(f"{unreal_parent_path}/Windows")
+	print()
+	if files_str:
+		# 压缩文件夹(有文件被复制才压缩)
+		zip_folder_to_owning_folder(f"{unreal_parent_path}/Windows")
 
-			# 成功之后，打开文件夹
-			open_win_folder(unreal_parent_path)
-		
-	print(f'CreateScriptsFolder: task complete {changelist_num=} \n {files_str}')
+		# 成功之后，打开文件夹
+		open_win_folder(unreal_parent_path)
+	else:
+		print(f'目标changelist{changelist_num_list=}没有py文件')
+	print()
+	print(f'CreateScriptsFolder: task complete {changelist_num_list=} \n {files_str}')
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
-	parser.add_argument("changelist", type=int, help="Changelist number")
+	# parser.add_argument("workspace", type=str, help="Workspace Name")
+	parser.add_argument("all_args", type=str, nargs='*', help="ALL Arguments")
 	args = parser.parse_args()
-	changelist_num = args.changelist
-	print(f'CreateScriptsFolder: task start {changelist_num=}')
-	if isinstance(changelist_num, str):
-		if changelist_num.isdigit():
-			changelist_num = int(changelist_num)
-		else:
-			print(f'CreateScriptsFolder: change num invalid {changelist_num=}')
+	all_args = args.all_args
+	print(f'CreateScriptsFolder: task start {all_args=}')
+	if len(all_args) > 0:
+		workspace_name = all_args[0]
+		check_output = run_win_command(['p4', 'clients', '-e', workspace_name])
+		print(f"{check_output=}")
+		if check_output:
+			changelist_num_list = all_args[1:]
+			print(f'CreateScriptsFolder: task start {workspace_name=} {changelist_num_list=}')
+			print()
 
-	_create_scripts_folder_from_changelist(changelist_num)
+			_create_scripts_folder_from_changelist(workspace_name, changelist_num_list)
+		else:
+			changelist_num_list = all_args
+			_create_scripts_folder_from_changelist('', changelist_num_list)
+	else:
+		print("Usage: python CreateScriptsFolder.py <workspace> <changelist_num1> <changelist_num2> or python CreateScriptsFolder.py <changelist_num1> <changelist_num2> ...")
