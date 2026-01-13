@@ -124,6 +124,28 @@ def create_workspace_file(workspace_name, user_name, branch_name, full_path):
 	except IOError as e:
 		print(f"创建code-workspace文件时出错: {e}")
 
+def run_set_up(full_path):
+	"""执行setup.bat"""
+	absolute_path = os.path.join(full_path, 'UnrealEngine', 'Setup.bat')
+	if not os.path.exists(absolute_path):
+		print(f"setup.bat文件不存在: {absolute_path}")
+		return False
+	# 执行 BAT 文件
+	try:
+		print(f"执行setup.bat文件，请等待数秒后检查授权弹窗")
+		result = subprocess.run(
+			absolute_path,
+			shell=True,
+			check=True,
+			capture_output=True,
+			text=True
+		)
+		print("✓ 执行成功")
+		print(result.stdout)
+	except subprocess.CalledProcessError as e:
+		print(f"✗ 执行失败: {e}")
+		print(f"错误输出: {e.stderr}")
+
 def main_function(workspace_name):
 	workspace_info_str = run_win_command(["p4", "client", "-o", f"{workspace_name}"])
 	lines = workspace_info_str.split('\n')
@@ -145,6 +167,8 @@ def main_function(workspace_name):
 	create_p4_config(workspace_name, user_name, root_path)
 
 	create_workspace_file(workspace_name, user_name, stream_name, root_path)
+
+	run_set_up(root_path)
 
 	return True
 
