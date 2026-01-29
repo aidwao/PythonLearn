@@ -1,11 +1,6 @@
 import regex
 import unicodedata
-# s = "المُعاقِب"
-# s="中文"
-# s="가나"
-# s="かな"
-# s = "கக ிகி"
-s = "1⃣2⃣3⃣"
+
 
 import unicodedata
 
@@ -57,6 +52,12 @@ def get_len_chinese(chinese_str) -> int:
 	size = int((len_str_utf8 - len_str) / 2 + len_str)
 	return size
 
+# s = "المُعاقِب"
+# s="中文"
+# s="가나"
+# s="かな"
+# s = "கக ிகி"
+s = "1⃣2⃣3⃣"
 print("normal len:", len(s))
 spilit_char_list = regex.findall(r'\X', s)
 print("regex result:", len(spilit_char_list))
