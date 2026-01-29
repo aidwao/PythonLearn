@@ -64,3 +64,5 @@ print("regex result:", len(spilit_char_list))
 print(f"regex result: {spilit_char_list=}")
 print(f"chinese result:", get_len_chinese(s))
 print(f"'{s}'  显示宽度: {get_display_width(s)=}")  # 9
+
+# test user
