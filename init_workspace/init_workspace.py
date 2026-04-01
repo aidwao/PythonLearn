@@ -67,49 +67,225 @@ P4CLIENT={workspace_name}''')
 # 常量定义
 WORKSPACE_TEMPLATE = {
 	"folders": [
-		{"path": "./Content/Marvel/Scripts"},
-		{"path": "./Config"},
-		{"path": "./Content/Marvel/EditorOnly/Scripts"},
-		{"path": "./doc"},
-		{"path": "./Content/Localization/Game"},
-		{"path": "./Source"},
-		{"path": "./Plugins"}
+		{
+			"name": "UE5",
+			"path": "."
+		},
+		{
+			"name": "Scripts",
+			"path": "./Marvel/Content/Marvel/Scripts"
+		},
+		{
+			"name": "EditorScripts",
+			"path": "./Marvel/Content/Marvel/EditorOnly/Scripts"
+		},
+		{
+			"name": "Config",
+			"path": "./Marvel/Config"
+		},
+		{
+			"name": "Docs",
+			"path": "./Marvel/doc"
+		},
+		{
+			"name": "Localization",
+			"path": "./Marvel/Content/Localization/Game"
+		},
+		{
+			"name": "Source",
+			"path": "./Marvel/Source"
+		},
+		{
+			"name": "Plugins",
+			"path": "./Marvel/Plugins"
+		}
 	],
 	"settings": {
-		"python.autoComplete.extraPaths": [],
-		"python.analysis.extraPaths": [],
+		"npm.autoDetect": "off",
+		"[python]": {
+			"editor.defaultFormatter": "ms-python.autopep8",
+			"editor.insertSpaces": False,
+			"editor.tabSize": 4
+		},
+		"python.languageServer": "Pylance",
+		"python.analysis.autoSearchPaths": False,
+		"python.analysis.userFileIndexingLimit": 5000,
+		"python.analysis.typeCheckingMode": "off",
+		"python.analysis.exclude": [
+			"${workspaceFolder:UE5}/**",
+			"${workspaceFolder:Config}/**"
+		],
+		"python.analysis.stubPath": "${workspaceFolder:Docs}",
+		"python.autoComplete.extraPaths": [
+			"${workspaceFolder:Scripts}",
+			"${workspaceFolder:Scripts}/../EditorOnly/Scripts",
+			"${workspaceFolder:Scripts}/../ScriptLibs/Python311/site-packages",
+			"${workspaceFolder:Scripts}/../ScriptLibs/Python311/site-packages-dev",
+			"${workspaceFolder:Config}",
+			"${workspaceFolder:Docs}",
+			"${workspaceFolder:Localization}",
+			"${workspaceFolder:Source}",
+			"${workspaceFolder:Plugins}"
+		],
+		"python.analysis.extraPaths": [
+			"${workspaceFolder:Scripts}",
+			"${workspaceFolder:Scripts}/../EditorOnly/Scripts",
+			"${workspaceFolder:Scripts}/../ScriptLibs/Python311/site-packages",
+			"${workspaceFolder:Scripts}/../ScriptLibs/Python311/site-packages-dev",
+			"${workspaceFolder:Config}",
+			"${workspaceFolder:Docs}",
+			"${workspaceFolder:Localization}",
+			"${workspaceFolder:Source}",
+			"${workspaceFolder:Plugins}"
+		],
+		"flake8.args": [
+			"--config=${workspaceFolder:Docs}/.conf/flake8.ini"
+		],
+		"python.formatting.provider": "yapf",
+		"python.formatting.yapfArgs": [
+			"--style=${workspaceFolder:UE5}/.config/.style.yapf"
+		],
+		"autopep8.args": [
+			"--global-config=${workspaceFolder:UE5}/.config/.pycodestyle"
+		],
+		"black-formatter.args": [
+			"--config=${workspaceFolder:UE5}/.config/.style.black"
+		],
+		"pylint.cwd": "${workspaceFolder:UE5}",
+		"pylint.args": [
+			"--rcfile=${workspaceFolder:UE5}/.config/.pylintrc"
+		],
 		"perforce.port": "ssl:x20.perforce.nie.netease.com:1666",
 		"perforce.debugModeActive": True,
 		"perforce.deleteOnFileDelete": True,
 		"perforce.editOnFileModified": True,
 		"perforce.editOnFileSave": True,
 		"perforce.addOnFileCreate": True,
+		"perforce.user": "",
+		"perforce.client": "",
 		"files.associations": {
 			"regex": "cpp",
 			"sstream": "cpp",
 			"*.rh": "cpp"
+		},
+		"files.exclude": {
+			".vs/**": True,
+			"FeaturePacks/**": True,
+			"Gaming.Xbox.Scarlett.x64/**": True,
+			"Minima/**": True,
+			"Samples/**": True,
+			"ORBIS_Development/**": True,
+			"Templates/**": True
 		}
+	},
+	"extensions": {
+		"recommendations": [
+			"ms-vscode.cpptools",
+			"ms-python.python",
+			"ms-python.pylint",
+			"ms-python.vscode-pylance",
+			"ms-python.autopep8",
+			"mjcrouch.perforce"
+		]
+	},
+	"launch": {
+		"version": "0.2.0",
+		"configurations": [
+			{
+				"name": "Python: Attach to localhost:5678",
+				"type": "debugpy",
+				"request": "attach",
+				"justMyCode": False,
+				"connect": {
+					"host": "localhost",
+					"port": 5678
+				},
+				"pathMappings": []
+			},
+			{
+				"name": "Python: Attach to localhost:5678 with script.uep",
+				"type": "debugpy",
+				"request": "attach",
+				"justMyCode": False,
+				"connect": {
+					"host": "localhost",
+					"port": 5678
+				},
+				"pathMappings": [
+					{
+						"localRoot": "${workspaceFolder:Scripts}",
+						"remoteRoot": "Scripts"
+					},
+					{
+						"localRoot": "${workspaceFolder:Scripts}/../ScriptLibs/Python311/lib/",
+						"remoteRoot": "lib"
+					},
+					{
+						"localRoot": "${workspaceFolder:Scripts}/../ScriptLibs/Python311/site-packages/",
+						"remoteRoot": "site-packages"
+					}
+				]
+			},
+			{
+				"name": "Python: Attach - PS4",
+				"type": "debugpy",
+				"request": "attach",
+				"connect": {
+					"host": "localhost",
+					"port": 5678
+				},
+				"justMyCode": False,
+				"pathMappings": [
+					{
+						"localRoot": "${workspaceFolder:Scripts}",
+						"remoteRoot": "/hostapp/Marvel/Content/Marvel/Scripts"
+					}
+				]
+			},
+			{
+				"name": "Python: Attach - PS5",
+				"type": "debugpy",
+				"request": "attach",
+				"connect": {
+					"host": "localhost",
+					"port": 5678
+				},
+				"justMyCode": False,
+				"pathMappings": [
+					{
+						"localRoot": "${workspaceFolder:Scripts}",
+						"remoteRoot": "/host/Marvel/Content/Marvel/Scripts"
+					}
+				]
+			},
+			{
+				"name": "Python: Attach - Xbox",
+				"type": "debugpy",
+				"request": "attach",
+				"connect": {
+					"host": "10.226.179.XXX",
+					"port": 5678
+				},
+				"justMyCode": False,
+				"pathMappings": [
+					{
+						"localRoot": "${workspaceFolder:Scripts}",
+						"remoteRoot": "G:/Marvel/Content/Marvel/Scripts"
+					}
+				]
+			}
+		]
 	}
 }
 
 def create_workspace_file(workspace_name, user_name, branch_name, full_path):
-	workspace_template = WORKSPACE_TEMPLATE.copy()
-	absolute_path = os.path.join(full_path, 'UnrealEngine', 'Marvel')
-	# 更新配置
+	import copy
+	workspace_template = copy.deepcopy(WORKSPACE_TEMPLATE)
+	absolute_path = os.path.join(full_path, 'UnrealEngine')
+
+	# 动态注入 perforce 用户信息
 	workspace_template["settings"]["perforce.user"] = user_name
 	workspace_template["settings"]["perforce.client"] = workspace_name
-
-	extra_paths = []
-	for extra_path in WORKSPACE_TEMPLATE['folders']:
-		extra_path = extra_path['path']
-		extra_path = extra_path.replace('./', '')
-		extra_path = extra_path.replace('/', '\\')
-		extra_paths.append(absolute_path + '\\' +extra_path)
-
-	for path in extra_paths:
-		full_path = os.path.join(absolute_path, path)
-		workspace_template["settings"]["python.autoComplete.extraPaths"].append(full_path)
-		workspace_template["settings"]["python.analysis.extraPaths"].append(full_path)
 
 	# 创建文件
 	file_name = f"Marvel_{branch_name}.code-workspace"
@@ -117,34 +293,12 @@ def create_workspace_file(workspace_name, user_name, branch_name, full_path):
 
 	try:
 		with open(file_path, "w") as f:
-			workspace_template = json.dumps(workspace_template, ensure_ascii=False,indent=4)
-			f.write(workspace_template)
+			workspace_json = json.dumps(workspace_template, ensure_ascii=False, indent=4)
+			f.write(workspace_json)
 		print(f'code-workspace文件创建完成: {file_path}')
 		open_win_folder(absolute_path)
 	except IOError as e:
 		print(f"创建code-workspace文件时出错: {e}")
-
-def run_set_up(full_path):
-	"""执行setup.bat"""
-	absolute_path = os.path.join(full_path, 'UnrealEngine', 'Setup.bat')
-	if not os.path.exists(absolute_path):
-		print(f"setup.bat文件不存在: {absolute_path}")
-		return False
-	# 执行 BAT 文件
-	try:
-		print(f"执行setup.bat文件，请等待数秒后检查授权弹窗")
-		result = subprocess.run(
-			absolute_path,
-			shell=True,
-			check=True,
-			capture_output=True,
-			text=True
-		)
-		print("✓ 执行成功")
-		print(result.stdout)
-	except subprocess.CalledProcessError as e:
-		print(f"✗ 执行失败: {e}")
-		print(f"错误输出: {e.stderr}")
 
 def main_function(workspace_name):
 	workspace_info_str = run_win_command(["p4", "client", "-o", f"{workspace_name}"])
@@ -168,8 +322,6 @@ def main_function(workspace_name):
 
 	create_workspace_file(workspace_name, user_name, stream_name, root_path)
 
-	run_set_up(root_path)
-
 	return True
 
 if __name__ == "__main__":
@@ -180,5 +332,3 @@ if __name__ == "__main__":
 	print(f" start init workspace {workspace_name=} ")
 	success = main_function(workspace_name)
 	print(f" end init {success=} ")
-
-		
